@@ -1,0 +1,7 @@
+export enum PlanSubscriptionEnum {
+  PLAN_FREE = 'PLAN_FREE',
+  PLAN_WEEKLY = 'PLAN_WEEKLY',
+  PLAN_MONTHLY = 'PLAN_MONTHLY',
+  PLAN_ANNUAL = 'PLAN_ANNUAL',
+  PLAN_PREMIUM = 'PLAN_PREMIUM',
+}

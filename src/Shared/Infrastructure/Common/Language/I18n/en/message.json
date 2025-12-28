@@ -1,0 +1,13 @@
+{
+  "logged_out": "Successfully logged out.",
+  "successful_service": "Successful service.",
+  "created": "Was successfully created.",
+  "updated": "Was successfully updated.",
+  "deleted": "Was successfully deleted.",
+  "deactivate": "was successfully deactivate.",
+  "user_does_not_register": "The user has not been registered.",
+  "business_does_not_register": "The company cannot add the new user.",
+  "the_password_used_before": "The password provided has been used before.",
+  "error_when_returning_ai_result": "Error when returning AI result.",
+  "it_was_cloned_successfully": "it was cloned successfully"
+}

@@ -1,0 +1,5 @@
+export enum ChatActionsEnum {
+  UPDATE_PREFERENCES = 'UPDATE_PREFERENCES',
+  IDEATION = 'IDEATION',
+  SIGN_IN = 'SIGN_IN',
+}

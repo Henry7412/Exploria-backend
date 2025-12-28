@@ -1,0 +1,15 @@
+{
+  "logged_out": "Se ha desconectado con éxito",
+  "successful_service": "Servicio exitoso.",
+  "created": "Se creó exitosamente.",
+  "updated": "Se actualizó exitosamente.",
+  "deleted": "Se eliminó exitosamente.",
+  "retrieved": "Mensajes cargados correctamente.",
+  "deactivate": "Se desactivo exitosamente.",
+  "user_does_not_register": "El usuario no ha podido ser registrado.",
+  "business_does_not_register": "La empresa no puede añadir el nuevo usuario.",
+  "the_password_used_before": "La contraseña proporcionada ha sido usada anteriormente.",
+  "error_when_returning_ai_result": "Error al retornar el resultado del sistema de inteligencia artificial.",
+  "it_was_cloned_successfully": "Se clonó exitosamente.",
+  "unpublished_content": "No hay contenidos publicados para generar el PDF."
+}

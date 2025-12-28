@@ -1,0 +1,32 @@
+services:
+  mongodb-exploria:
+    image: mongo:7.0
+    container_name: exploria_mongodb
+    restart: always
+    ports:
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_DATABASE: exploria_db
+    volumes:
+      - exploria_mongo_data:/data/db
+    networks:
+      - exploria_net
+
+  redis-exploria:
+    image: redis:7.2
+    container_name: exploria_redis
+    restart: always
+    ports:
+      - "6381:6379"
+    volumes:
+      - exploria_redis_data:/data
+    networks:
+      - exploria_net
+
+volumes:
+  exploria_mongo_data:
+  exploria_redis_data:
+
+networks:
+  exploria_net:
+    driver: bridge
