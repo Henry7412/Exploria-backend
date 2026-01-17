@@ -3,25 +3,31 @@ import {
   ExecutionContext,
   Injectable,
   NestInterceptor,
+  StreamableFile,
 } from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { Observable, map } from 'rxjs';
 
-export interface Response<T> {
+export interface ResponseShape<T = unknown> {
   data: T;
 }
 
 @Injectable()
-export class ResponseInterceptor<T> implements NestInterceptor<T, Response<T>> {
-  intercept(
-    context: ExecutionContext,
-    next: CallHandler<T>,
-  ): Observable<Response<T>> {
+export class ResponseInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     return next.handle().pipe(
-      map((data: T) => {
-        if (typeof data === 'string') {
-          return { data: data as T };
+      map((data: any) => {
+        if (data instanceof StreamableFile) {
+          return data;
         }
+
+        if (Buffer.isBuffer(data)) {
+          return data;
+        }
+
+        if (typeof data === 'string') {
+          return { data };
+        }
+
         return { data };
       }),
     );

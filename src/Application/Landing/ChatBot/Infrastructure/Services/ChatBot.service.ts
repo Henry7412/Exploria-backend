@@ -1,13 +1,19 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthDto } from '@/Shared/Infrastructure/Common/Dto/Auth.dto';
 import { StoreChatDto } from '@/Application/Landing/ChatBot/Infrastructure/Dto/StoreChatBot.dto';
 import { UserRepository } from '@/Application/Common/User/Infrastructure/Repositories/User.repository';
 import { I18nService } from 'nestjs-i18n';
-import { ChatPreferences } from '@/Application/Landing/ChatBot/Infrastructure/Utils/Chat.utils';
+import {
+  ChatPreferences,
+  synthesizeTextWithGoogle,
+  transcribeAudioWithGoogle,
+} from '@/Application/Landing/ChatBot/Infrastructure/Utils/Chat.utils';
 import { ChatBotRepository } from '@/Application/Landing/ChatBot/Infrastructure/Repositories/ChatBot.respository';
 import { Types } from 'mongoose';
 import { messageI18n } from '@/Shared/Infrastructure/Helper/I18n.helper';
@@ -25,6 +31,8 @@ import { RecommendationDto } from '@/Application/Landing/ChatBot/Infrastructure/
 import { UserProfile } from '@/Shared/Infrastructure/Common/Gemini/Type/UserProfile';
 import { Logger } from '@/Shared/Infrastructure/Logger/Logger';
 import { ChatActionsEnum } from '@/Shared/Infrastructure/Common/Enum/ChatActions.enum';
+import { AudioInterface } from '@/Application/Landing/ChatBot/Job/Interface/Audio.interface';
+import { TextToSpeechDto } from '@/Application/Landing/ChatBot/Infrastructure/Dto/TexttoSpeech.dto';
 
 @Injectable()
 export class ChatBotService {
@@ -695,5 +703,86 @@ export class ChatBotService {
         total,
       },
     };
+  }
+
+  async messageAudio(
+    authDto: AuthDto,
+    audioInterface: AudioInterface,
+  ): Promise<{ transcript: string }> {
+    const { file } = audioInterface;
+
+    if (!authDto?._id) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    let transcript: string;
+    try {
+      transcript = await transcribeAudioWithGoogle(file);
+    } catch (e: any) {
+      throw new BadRequestException(e?.message || 'Audio transcription failed');
+    }
+
+    await this.creditsRepository.consumeCreditDynamic(
+      authDto,
+      CREDIT_COSTS.AUDIO,
+    );
+
+    await this.chatBotRepository.saveMessage({
+      chatId: authDto._id,
+      role: 'user',
+      value: transcript,
+      createdBy: {
+        _id: authDto._id,
+        names: authDto.names,
+        lastNames: authDto.lastNames,
+        picture: authDto.picturePath,
+      },
+    });
+
+    return { transcript };
+  }
+
+  async messageTts(authDto: any, dto: TextToSpeechDto) {
+    if (!authDto?._id) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    let audioBuffer: Buffer;
+    let mimeType: string;
+
+    try {
+      const result = await synthesizeTextWithGoogle({
+        text: dto.text,
+        languageCode: dto.languageCode ?? 'es-PE',
+        voiceName: dto.voiceName,
+        format: dto.format ?? 'mp3',
+        speakingRate: dto.speakingRate ?? 1.0,
+        pitch: dto.pitch ?? 0,
+      });
+
+      audioBuffer = result.buffer;
+      mimeType = result.mimeType;
+    } catch (e: any) {
+      throw new BadRequestException(e?.message || 'Text to speech failed');
+    }
+
+    await this.creditsRepository.consumeCreditDynamic(
+      authDto,
+      CREDIT_COSTS.AUDIO,
+    );
+
+    await this.chatBotRepository.saveMessage({
+      chatId: authDto._id,
+      role: 'system',
+      value: dto.text,
+      createdBy: {
+        _id: authDto._id,
+        names: authDto.names,
+        lastNames: authDto.lastNames,
+        picture: authDto.picturePath,
+      },
+    });
+
+    return { audioBuffer, mimeType };
   }
 }

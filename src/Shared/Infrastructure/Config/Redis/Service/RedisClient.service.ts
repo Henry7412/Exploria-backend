@@ -14,8 +14,16 @@ export class RedisClientService {
     return await this.cacheManager.get(key);
   }
 
-  async createItem(key: string, value: any): Promise<void> {
-    await this.cacheManager.set(key, value);
+  async createItem(
+    key: string,
+    value: any,
+    ttlSeconds?: number,
+  ): Promise<void> {
+    if (ttlSeconds) {
+      await this.cacheManager.set(key, value, ttlSeconds * 1000);
+    } else {
+      await this.cacheManager.set(key, value);
+    }
   }
 
   async updateItem(key: string, value: any): Promise<void> {

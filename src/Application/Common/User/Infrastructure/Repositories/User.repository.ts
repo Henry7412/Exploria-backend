@@ -46,4 +46,11 @@ export class UserRepository extends BaseRepository<User> {
       )
       .exec();
   }
+
+  async updatePasswordById(userId: string, hashedPassword: string) {
+    return this.userModel.updateOne(
+      { _id: userId, active: true },
+      { $set: { password: hashedPassword, updatedAt: new Date() } },
+    );
+  }
 }

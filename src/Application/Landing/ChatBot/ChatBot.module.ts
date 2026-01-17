@@ -25,6 +25,10 @@ import { ChatDetailController } from '@/Application/Landing/ChatBot/Infrastructu
 import { ChatDetailUseCase } from '@/Application/Landing/ChatBot/Application/Get/ChatDetail.useCase';
 import { GeminiRecommendationUseCase } from '@/Application/Landing/ChatBot/Application/Post/GeminiRecommendation.useCase';
 import { GeminiRecommendationController } from '@/Application/Landing/ChatBot/Infrastructure/Controllers/GeminiRecommendation.controller';
+import { AudioMessageController } from '@/Application/Landing/ChatBot/Infrastructure/Controllers/AudioMessage.controller';
+import { AudioMessageUseCase } from '@/Application/Landing/ChatBot/Application/Post/AudioMessage.useCase';
+import { AudioToTextMessageController } from '@/Application/Landing/ChatBot/Infrastructure/Controllers/AudioToTextMessage.controller';
+import { AudioToTextMessageUseCase } from '@/Application/Landing/ChatBot/Application/Post/AudioToTextMessage.useCase';
 
 @Module({
   imports: [
@@ -52,7 +56,8 @@ import { GeminiRecommendationController } from '@/Application/Landing/ChatBot/In
     // ChatHistoryController,
     // FileMessageController,
     // PlannerController,
-    // AudioMessageController,
+    AudioMessageController,
+    AudioToTextMessageController,
   ],
   providers: [
     ChatBotService,
@@ -67,7 +72,8 @@ import { GeminiRecommendationController } from '@/Application/Landing/ChatBot/In
     // ChatHistoryUseCase,
     // FileMessageUseCase,
     // PlannerUseCase,
-    // AudioMessageUseCase,
+    AudioMessageUseCase,
+    AudioToTextMessageUseCase,
   ],
   exports: [ChatBotService, ChatBotRepository],
 })

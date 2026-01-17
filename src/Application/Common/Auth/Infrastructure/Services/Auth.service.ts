@@ -14,6 +14,10 @@ import { showAuthUser } from '@/Shared/Infrastructure/Helper/Auth.helper';
 import { AuthSignInDto } from '@/Application/Common/Auth/Infrastructure/Dto/AuthSignIn.dto';
 import { RedisClientService } from '@/Shared/Infrastructure/Config/Redis/Service/RedisClient.service';
 import { pathS3 } from '@/Shared/Infrastructure/Upload/CommonImage.upload';
+import { ForgotPasswordDto } from '@/Application/Common/Auth/Infrastructure/Dto/ForgotPassword.dto';
+import { ResetPasswordDto } from '@/Application/Common/Auth/Infrastructure/Dto/ResetPassword.dto';
+import { MailService } from '@/Shared/Infrastructure/Mail/Mail.service';
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -22,6 +26,7 @@ export class AuthService {
     private readonly userRepository: UserRepository,
     private readonly redisClientService: RedisClientService,
     private readonly i18n: I18nService,
+    private readonly mailService: MailService,
   ) {}
 
   async registerUser(authRegisterDto: AuthRegisterDto) {
@@ -128,5 +133,48 @@ export class AuthService {
       picture: pathS3(picture),
       picturePath: picture,
     });
+  }
+
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
+    const user = await this.userRepository.findByEmailOrPhone(
+      forgotPasswordDto.email,
+    );
+
+    if (!user?.email) {
+      return { ok: true };
+    }
+
+    const token = randomBytes(32).toString('hex');
+    const ttlMinutes = Number(process.env.PASSWORD_RESET_TTL_MINUTES || 15);
+    const key = `reset:${token}`;
+
+    await this.redisClientService.createItem(
+      key,
+      { userId: user._id.toString() },
+      ttlMinutes * 60,
+    );
+
+    const link = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+
+    await this.mailService.sendPasswordReset(user.email, link);
+
+    return { ok: true };
+  }
+
+  async resetPassword(resetPasswordDto: ResetPasswordDto) {
+    const key = `reset:${resetPasswordDto.token}`;
+    const data = await this.redisClientService.getItem(key);
+
+    if (!data?.userId) {
+      throw new BadRequestException('INVALID_OR_EXPIRED_TOKEN');
+    }
+
+    const hashedPassword = await bcrypt.hash(resetPasswordDto.newPassword, 10);
+
+    await this.userRepository.updatePasswordById(data.userId, hashedPassword);
+
+    await this.redisClientService.deleteItem(key);
+
+    return { ok: true };
   }
 }

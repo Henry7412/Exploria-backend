@@ -1,4 +1,8 @@
 import { Types } from 'mongoose';
+import {
+  getGoogleSpeechClient,
+  getGoogleTtsClient,
+} from '@/Shared/Infrastructure/Utils/Speech';
 
 export type ChatPreferences = {
   _id: Types.ObjectId;
@@ -38,25 +42,168 @@ export type ChatPreferences = {
 //   return message;
 // }
 //
-// export async function transcribeAudioWithGoogle(
-//   file: UploadedFile,
-// ): Promise<string> {
-//   const client = getGoogleSpeechClient();
-//
-//   const audioBytes = file.buffer.toString('base64');
-//
-//   const [response] = await client.recognize({
-//     audio: { content: audioBytes },
-//     config: {
-//       encoding: 'MP3',
-//       sampleRateHertz: 16000,
-//       languageCode: 'es-PE',
-//     },
-//   });
-//
-//   const transcript = response.results
-//     ?.map((r) => r.alternatives?.[0]?.transcript)
-//     .join('\n');
-//
-//   return transcript ?? 'No se pudo transcribir el audio';
-// }
+type UploadedFile = {
+  mimetype: string;
+  size: number;
+  originalname?: string;
+  buffer: Buffer;
+};
+
+type AudioConfig = {
+  encoding: any;
+  sampleRateHertz?: number;
+};
+
+function normalizeMime(mimetype: string) {
+  return (mimetype || '').split(';')[0].trim().toLowerCase();
+}
+
+function getAudioConfig(mimetype: string): AudioConfig {
+  const mime = normalizeMime(mimetype);
+
+  if (
+    mime === 'audio/ogg' ||
+    mime === 'audio/opus' ||
+    mime === 'application/ogg'
+  ) {
+    return {
+      encoding: 'OGG_OPUS',
+      sampleRateHertz: 48000,
+    };
+  }
+
+  if (mime === 'audio/webm' || mime === 'video/webm') {
+    return {
+      encoding: 'WEBM_OPUS',
+      sampleRateHertz: 48000,
+    };
+  }
+
+  if (mime === 'audio/wav' || mime === 'audio/x-wav') {
+    return { encoding: 'LINEAR16' };
+  }
+
+  if (mime === 'audio/mpeg' || mime === 'audio/mp3') {
+    return { encoding: 'MP3' };
+  }
+
+  throw new Error(`Unsupported audio mimetype: ${mimetype}`);
+}
+
+export async function transcribeAudioWithGoogle(
+  file: UploadedFile,
+): Promise<string> {
+  const client = getGoogleSpeechClient();
+
+  if (!client) {
+    throw new Error('Speech client not available');
+  }
+
+  if (!file?.buffer?.length) {
+    throw new Error('Empty audio buffer');
+  }
+
+  const audioConfig = getAudioConfig(file.mimetype);
+  const audioBytes = file.buffer.toString('base64');
+
+  let response: any;
+
+  try {
+    const [res] = await client.recognize({
+      audio: { content: audioBytes },
+      config: {
+        ...audioConfig,
+        languageCode: 'es-PE',
+        enableAutomaticPunctuation: true,
+      },
+    });
+
+    response = res;
+  } catch (err: any) {
+    // ✅ Log de error real de Google
+
+    throw new Error(err?.message || 'Google Speech-to-Text failed');
+  }
+
+  const transcript =
+    response?.results
+      ?.map((r: any) => r?.alternatives?.[0]?.transcript)
+      .filter(Boolean)
+      .join('\n') ?? '';
+
+  const finalText = transcript.trim();
+
+  // ✅ Si no hay texto, NO lo devuelvas como éxito
+  if (!finalText) {
+    throw new Error(
+      'Speech-to-Text no devolvió resultados (audio sin voz, codec/config incorrecta, sample rate mismatch o audio largo).',
+    );
+  }
+
+  return finalText;
+}
+
+export type TtsFormat = 'mp3' | 'ogg';
+
+export type TtsOptions = {
+  text: string;
+  languageCode?: string; // default: es-PE
+  voiceName?: string; // opcional
+  speakingRate?: number; // 0.25 - 4.0
+  pitch?: number; // -20 - 20
+  format?: TtsFormat; // mp3 | ogg
+};
+
+export async function synthesizeTextWithGoogle(
+  options: TtsOptions,
+): Promise<{ buffer: Buffer; mimeType: string }> {
+  const client = getGoogleTtsClient();
+
+  const {
+    text,
+    languageCode = 'es-PE',
+    voiceName,
+    speakingRate = 1.0,
+    pitch = 0.0,
+    format = 'mp3',
+  } = options;
+
+  if (!text?.trim()) {
+    throw new Error('Text is required');
+  }
+
+  console.log('=========== TTS DEBUG ===========');
+  console.log('Text length:', text.length);
+  console.log('Language:', languageCode);
+  console.log('Voice:', voiceName ?? 'default');
+  console.log('Format:', format);
+  console.log('================================');
+
+  const request: any = {
+    input: { text },
+    voice: {
+      languageCode,
+      ...(voiceName ? { name: voiceName } : {}),
+    },
+    audioConfig: {
+      audioEncoding: format === 'ogg' ? 'OGG_OPUS' : 'MP3',
+      speakingRate,
+      pitch,
+    },
+  };
+
+  const [response] = await client.synthesizeSpeech(request);
+
+  if (!response.audioContent) {
+    throw new Error('TTS did not return audio');
+  }
+
+  const buffer = Buffer.isBuffer(response.audioContent)
+    ? response.audioContent
+    : Buffer.from(response.audioContent as any);
+
+  return {
+    buffer,
+    mimeType: format === 'ogg' ? 'audio/ogg' : 'audio/mpeg',
+  };
+}

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 
@@ -17,20 +17,21 @@ export class CreditsRepository {
   async consumeCreditDynamic(
     authDto: AuthDto,
     quantity: number = 1,
-  ): Promise<CreditsDocument | null> {
+  ): Promise<CreditsDocument> {
+    if (!authDto._id) {
+      throw new BadRequestException('User id is required to consume credits');
+    }
+
     const filter: any = {
       active: true,
       quantity: { $gte: quantity },
+      userId: new Types.ObjectId(authDto._id),
     };
 
-    if (authDto._id) {
-      filter.userId = new Types.ObjectId(authDto._id);
-    } else {
-      return null;
-    }
-
     const creditDoc = await this.creditsModel.findOne(filter);
-    if (!creditDoc) return null;
+    if (!creditDoc) {
+      throw new BadRequestException('Insufficient credits');
+    }
 
     const logEntry = {
       status: CreditStatusEnum.CONSUMED,
@@ -41,11 +42,11 @@ export class CreditsRepository {
         names: authDto.names ?? '',
         lastNames: authDto.lastNames ?? '',
         picture: authDto.picturePath ?? '',
-        userId: authDto._id ? new Types.ObjectId(authDto._id) : null,
+        userId: new Types.ObjectId(authDto._id),
       },
     };
 
-    return this.creditsModel.findOneAndUpdate(
+    const updated = await this.creditsModel.findOneAndUpdate(
       { _id: creditDoc._id },
       {
         $inc: { quantity: -quantity },
@@ -57,6 +58,12 @@ export class CreditsRepository {
       },
       { new: true },
     );
+
+    if (!updated) {
+      throw new BadRequestException('Failed to consume credits');
+    }
+
+    return updated;
   }
 
   async updateOne(
