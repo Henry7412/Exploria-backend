@@ -1,15 +1,15 @@
 export interface UserProfile {
   name: string;
-  interest: string[];
+  jobTitle: string;
+  interest: any[];
   hobbies: string;
   languages: string[];
   aboutMe: string;
   age: number | null;
   nationality: string;
-  medicalConsiderations?: string;
-  funFact?: string;
-  jobTitle?: string;
-  favoriteFoods?: string;
-  voiceTones?: string[];
-  perspectives?: string[];
+  favoriteFoods: string;
+  medicalConsiderations: string;
+  funFact: string;
+  perspectives: any[];
+  voiceTones: any[];
 }

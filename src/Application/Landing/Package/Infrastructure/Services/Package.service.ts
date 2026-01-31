@@ -10,9 +10,7 @@ export class PackageService {
     const packages = await this.packageRepository.findAllPackages();
 
     return {
-      data: {
-        items: packages,
-      },
+      items: packages,
     };
   }
 }

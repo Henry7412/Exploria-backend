@@ -128,7 +128,7 @@ export class ChatBotRepository {
   async saveMessage(message: {
     chatId: Types.ObjectId;
     role: 'user' | 'model' | 'system';
-    value: string;
+    value: any;
     model?: string;
     toxicity?: number;
     createdBy?: {
@@ -205,11 +205,13 @@ export class ChatBotRepository {
     chatId: Types.ObjectId,
     limit = 10,
   ): Promise<MessageDocument[]> {
-    return this.messageModel
+    const items = await this.messageModel
       .find({ chatId })
-      .sort({ createdAt: 1 })
+      .sort({ createdAt: -1 })
       .limit(limit)
       .lean();
+
+    return items.reverse();
   }
 
   async getAllActivePrompts(

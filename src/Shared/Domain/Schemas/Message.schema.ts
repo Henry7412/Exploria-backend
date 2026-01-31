@@ -13,7 +13,7 @@ export class MessageDocument {
   role: 'user' | 'model' | 'system';
 
   @Prop({ type: MongooseSchema.Types.Mixed, required: true })
-  value: string;
+  value: any;
 
   @Prop({ type: Number, required: false, default: null })
   toxicity?: number;

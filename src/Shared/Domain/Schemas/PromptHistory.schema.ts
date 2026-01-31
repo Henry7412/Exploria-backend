@@ -9,9 +9,6 @@ export class PromptHistoryDocument {
   @Prop({ type: String, required: true, enum: ActionTypeEnum })
   name: ActionTypeEnum;
 
-  // @Prop({ type: [String], required: true, enum: ALL_PROMPT_CONTENT_TYPES })
-  // types: string[];
-
   @Prop({ type: String, required: true })
   promptIntro: string;
 

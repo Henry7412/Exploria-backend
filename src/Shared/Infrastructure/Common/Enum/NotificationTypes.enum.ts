@@ -15,4 +15,5 @@ export enum NotificationTypesEnum {
   SUBSCRIPTION_PURCHASE_CANCELLED = 'subscription_purchase_cancelled',
   SUBSCRIPTION_PURCHASE_REQUESTED = 'subscription_purchase_requested',
   SUBSCRIPTION_EXPIRING = 'subscription_expiring',
+  CREDITS_LOW = 'credits_low',
 }

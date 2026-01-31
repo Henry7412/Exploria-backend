@@ -3,16 +3,6 @@
   "email_unique": "El email ya fue registrado anteriormente.",
   "phone_number_unique": "El número de teléfono ya fue registrado anteriormente.",
   "auth_success": "Ha iniciado sesión de manera satisfactoria.",
-  "business_active": "La empresa no esta activa.",
-  "user_not_associated_business": "El usuario {email} no está asociado a un negocio.",
-  "user_not_associated_to_business": "El usuario {email} no está asociado al negocio especificado.",
-  "no_answers_found": "No se han encontrado respuestas en el negocio.",
-  "no_review_found": "No se han encontrado reseñas en el negocio.",
-  "no_review_found_discovery": "No se han encontrado reseñas.",
-  "no_review_found_business": "No se han encontrado negocios.",
-  "no_review_exist": "La reseña no existe.",
-  "no_business_exist": "El negocio no existe.",
-  "no_reaction_exist": "La reacción no existe.",
   "blocked_recovery_password": "Se ha bloqueado el intento de recuperar contraseña por {hour}.",
   "token_magic_used": "Este token ya fue usado, porfavor genere otro.",
   "path_registered": "El path ya se encuentra registrado, intente con otro path.",
@@ -57,5 +47,6 @@
   "document_not_found": "Documento no encontrado",
   "not_published": "El contenido debe estar publicado para generar PDF",
   "your_current_plan_does_not_allow_downloading_PDFs": "Tu plan actual no permite descargar PDFs",
-  "user_already_exists": "El usuario ya existe"
+  "user_already_exists": "El usuario ya existe",
+  "user_not_authenticated": "Debes iniciar sesion"
 }

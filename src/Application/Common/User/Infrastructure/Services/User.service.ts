@@ -3,6 +3,8 @@ import { UserRepository } from '@/Application/Common/User/Infrastructure/Reposit
 import { I18nService } from 'nestjs-i18n';
 import { AuthDto } from '@/Shared/Infrastructure/Common/Dto/Auth.dto';
 import { UpdateProfileDto } from '@/Application/Common/User/Infrastructure/Dto/UpdateProfile.dto';
+import { GetUserPictureInterface } from '@/Application/Common/User/Infrastructure/Interfaces/GetUserPicture.interface';
+import { imageUserPictureUpload } from '@/Shared/Infrastructure/Common/Upload/ImageUserPicture.upload';
 
 @Injectable()
 export class UserService {
@@ -55,5 +57,15 @@ export class UserService {
     const userId = authDto._id;
 
     await this.userRepository.updateOne({ _id: userId }, { ...attributes });
+  }
+
+  async userPicture(
+    authDto: AuthDto,
+    getUserPictureInterface: GetUserPictureInterface,
+  ) {
+    const { _id } = authDto;
+    const { file } = getUserPictureInterface;
+
+    return await imageUserPictureUpload(file, _id);
   }
 }

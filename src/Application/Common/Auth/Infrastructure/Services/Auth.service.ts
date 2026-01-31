@@ -154,7 +154,7 @@ export class AuthService {
       ttlMinutes * 60,
     );
 
-    const link = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+    const link = `${process.env.FRONTEND_URL}/auth/reset-password?token=${token}`;
 
     await this.mailService.sendPasswordReset(user.email, link);
 

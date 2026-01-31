@@ -10,6 +10,10 @@ import { GeminiRecommendationsPrompts } from '@/Shared/Infrastructure/Common/Gem
     GeminiService,
     GeminiRecommendationsPrompts,
   ],
-  exports: [GeminiService, GeminiRecommendationsPrompts],
+  exports: [
+    GeminiService,
+    GeminiRecommendationsPrompts,
+    ChatGeminiCompletionUtils,
+  ],
 })
 export class GeminiModule {}

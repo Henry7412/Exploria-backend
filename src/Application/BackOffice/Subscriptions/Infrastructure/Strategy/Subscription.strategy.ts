@@ -10,13 +10,6 @@ export const CREDIT_COSTS = {
   PERSONALIZED_RECOMMENDATIONS: 10,
 };
 
-export const REVIEW_REWARD_CREDITS = {
-  STARS: 1,
-  PHOTO: 1,
-  COMMENT: 1,
-  PUBLIC_REVIEW: 2,
-};
-
 export function calculateEndDate(
   plan: { duration: number; period: BillingPeriodEnum },
   fromDate: Date,

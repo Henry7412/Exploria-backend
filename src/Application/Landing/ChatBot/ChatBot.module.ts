@@ -29,6 +29,15 @@ import { AudioMessageController } from '@/Application/Landing/ChatBot/Infrastruc
 import { AudioMessageUseCase } from '@/Application/Landing/ChatBot/Application/Post/AudioMessage.useCase';
 import { AudioToTextMessageController } from '@/Application/Landing/ChatBot/Infrastructure/Controllers/AudioToTextMessage.controller';
 import { AudioToTextMessageUseCase } from '@/Application/Landing/ChatBot/Application/Post/AudioToTextMessage.useCase';
+import { ChatbotImageController } from '@/Application/Landing/ChatBot/Infrastructure/Controllers/ChabotImage.controller';
+import { ChatbotImageUseCase } from '@/Application/Landing/ChatBot/Application/Post/ChabotImage.useCase';
+import { NationalitySchema } from '@/Shared/Domain/Schemas/Nationalities.schema';
+import { RagModule } from '@/Application/Landing/Rag/Rag.module';
+import { RedisConfigMain } from '@/Shared/Infrastructure/Config/Redis/RedisConfig.main';
+
+import { ChatMetricsRepository } from '@/Application/Landing/ChatBot/Infrastructure/Repositories/ChatMetrics.repository';
+import { MetricsController } from '@/Application/Landing/ChatBot/Infrastructure/Controllers/Metrics.controller';
+import { ChatMetricSchema } from '@/Shared/Domain/Schemas/ChatMetrics.schema';
 
 @Module({
   imports: [
@@ -40,11 +49,15 @@ import { AudioToTextMessageUseCase } from '@/Application/Landing/ChatBot/Applica
       { name: 'User', schema: UserSchema },
       { name: 'Subscriptions', schema: SubscriptionsSchema },
       { name: 'Credits', schema: CreditsSchema },
+      { name: 'Nationalities', schema: NationalitySchema },
+      { name: 'ChatMetric', schema: ChatMetricSchema },
     ]),
     // BullModule.registerQueue({ name: 'FileMessageJob' }),
     GeminiModule,
     CreditsModule,
     UserModule,
+    RagModule,
+    RedisConfigMain,
   ],
   controllers: [
     StoreConversationController,
@@ -58,6 +71,8 @@ import { AudioToTextMessageUseCase } from '@/Application/Landing/ChatBot/Applica
     // PlannerController,
     AudioMessageController,
     AudioToTextMessageController,
+    ChatbotImageController,
+    MetricsController,
   ],
   providers: [
     ChatBotService,
@@ -74,7 +89,9 @@ import { AudioToTextMessageUseCase } from '@/Application/Landing/ChatBot/Applica
     // PlannerUseCase,
     AudioMessageUseCase,
     AudioToTextMessageUseCase,
+    ChatbotImageUseCase,
+    ChatMetricsRepository,
   ],
-  exports: [ChatBotService, ChatBotRepository],
+  exports: [ChatBotService, ChatBotRepository, ChatMetricsRepository],
 })
 export class ChatBotModule {}

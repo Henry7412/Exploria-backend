@@ -1,5 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  IsArray,
   IsBoolean,
   IsEnum,
   IsNotEmpty,
@@ -43,16 +44,24 @@ export class ChatMemoryDto {
   funFact: string;
 
   @IsOptional()
-  @IsEnum(ProfessionalViewEnum, { each: true })
+  @IsArray({ message: 'Las perspectivas deben ser una lista' })
+  @IsEnum(ProfessionalViewEnum, {
+    each: true,
+    message: 'La perspectiva seleccionada no es válida',
+  })
   @Type(() => String)
   perspectives: ProfessionalViewEnum[];
 
   @IsOptional()
-  @IsEnum(VoiceToneEnum, { each: true })
+  @IsArray({ message: 'Los tonos de voz deben ser una lista' })
+  @IsEnum(VoiceToneEnum, {
+    each: true,
+    message: 'El tono de voz seleccionado no es válido',
+  })
   @Type(() => String)
   voiceTones: VoiceToneEnum[];
 
-  @IsNotEmpty()
-  @IsBoolean()
-  user: boolean;
+  @IsOptional()
+  @IsBoolean({ message: 'El campo user debe ser verdadero o falso' })
+  user?: boolean;
 }

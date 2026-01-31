@@ -1,7 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { I18nService } from 'nestjs-i18n';
-import { ChatGeminiCompletionUtils } from '@/Shared/Infrastructure/Common/Gemini/Utils/ChatGeminiCompletion.utils';
+import {
+  ChatGeminiCompletionUtils,
+  GeminiPart,
+} from '@/Shared/Infrastructure/Common/Gemini/Utils/ChatGeminiCompletion.utils';
 import { GeminiRecommendationsPrompts } from '@/Shared/Infrastructure/Common/Gemini/Promps/GeminiRecommendations.prompts';
+
+type HistoryMsgLegacy = {
+  role: 'user' | 'model' | 'system';
+  content: string;
+};
+
+type HistoryMsgParts = {
+  role: 'user' | 'model' | 'system';
+  parts: GeminiPart[];
+};
+
+type HistoryMsg = HistoryMsgLegacy | HistoryMsgParts;
 
 @Injectable()
 export class GeminiService {
@@ -34,26 +49,20 @@ export class GeminiService {
   }
 
   async chatWithHistory(
-    messages: { role: 'user' | 'model' | 'system'; content: string }[],
+    messages: HistoryMsg[],
     systemPrompt?: string,
   ): Promise<any> {
-    const contents: any[] = [];
-
-    if (systemPrompt) {
-      contents.push({
-        role: 'model',
-        parts: [{ text: systemPrompt.trim() }],
-      });
-    }
+    const contents: Array<{ role: string; parts: GeminiPart[] }> = [];
 
     for (const msg of messages) {
       const role = msg.role === 'system' ? 'model' : msg.role;
-      contents.push({
-        role,
-        parts: [{ text: msg.content }],
-      });
+
+      const parts: GeminiPart[] =
+        'parts' in msg ? msg.parts : [{ text: (msg.content ?? '').toString() }];
+
+      contents.push({ role, parts });
     }
 
-    return await this.geminiUtils.geminiChatCompletion(contents);
+    return await this.geminiUtils.geminiChatCompletion(contents, systemPrompt);
   }
 }

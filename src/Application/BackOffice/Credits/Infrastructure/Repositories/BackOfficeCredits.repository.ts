@@ -357,4 +357,15 @@ export class BackOfficeCreditsRepository {
       .populate('packageId', '_id name')
       .lean();
   }
+
+  findLowCredits(threshold: number) {
+    return this.backOfficeCreditsModel
+      .find({
+        active: true,
+        quantity: { $gt: 0, $lte: threshold },
+        // si usas status:
+        // status: CreditStatusEnum.ACTIVE,
+      })
+      .lean();
+  }
 }

@@ -1,12 +1,10 @@
+import { IsEnum, IsNotEmpty, IsOptional } from 'class-validator';
+import { ActionTypeEnum } from '@/Shared/Infrastructure/Common/Enum/ActionType.enum';
 import { Transform } from 'class-transformer';
-import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { Types } from 'mongoose';
 
-import { ActionTypeEnum } from '@/Shared/Infrastructure/Common/Enum/ActionType.enum';
-
 export class RecommendationDto {
-  @IsOptional()
-  @IsString()
+  @IsNotEmpty()
   @IsEnum(ActionTypeEnum)
   action: ActionTypeEnum;
 
@@ -15,6 +13,5 @@ export class RecommendationDto {
   chatId: Types.ObjectId | null;
 
   @IsNotEmpty()
-  @IsString()
   deviceId: string;
 }

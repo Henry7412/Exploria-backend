@@ -33,6 +33,15 @@ import { Logger } from '@/Shared/Infrastructure/Logger/Logger';
 import { ChatActionsEnum } from '@/Shared/Infrastructure/Common/Enum/ChatActions.enum';
 import { AudioInterface } from '@/Application/Landing/ChatBot/Job/Interface/Audio.interface';
 import { TextToSpeechDto } from '@/Application/Landing/ChatBot/Infrastructure/Dto/TexttoSpeech.dto';
+import { ChatbotImageUploadInterface } from '@/Application/Landing/ChatBot/Infrastructure/Interfaces/ChatbotImageUpload.interface';
+import { imageChatbotUpload } from '@/Shared/Infrastructure/Common/Upload/imageChatbot,upload';
+import {
+  GeminiPart,
+  messageToText,
+  toGeminiMsgFromDb,
+} from '@/Shared/Infrastructure/Common/Gemini/Utils/ChatGeminiCompletion.utils';
+import { RagQueryUseCase } from '@/Application/Landing/Rag/Application/RagUseCase/RagQuery.useCase';
+import { ChatMetricsRepository } from '@/Application/Landing/ChatBot/Infrastructure/Repositories/ChatMetrics.repository';
 
 @Injectable()
 export class ChatBotService {
@@ -43,6 +52,8 @@ export class ChatBotService {
     private readonly userRepository: UserRepository,
     private readonly creditsRepository: CreditsRepository,
     private readonly i18n: I18nService,
+    private readonly ragQueryUseCase: RagQueryUseCase,
+    private readonly chatMetricsRepository: ChatMetricsRepository,
   ) {}
 
   async createChat(
@@ -212,209 +223,377 @@ export class ChatBotService {
     chatIdDto: ChatIdDto,
     messagesDto: MessagesDto,
   ): Promise<any> {
-    const toxicity = await this.perspectiveService.analyzeToxicity(
-      messagesDto.value,
-    );
+    const text = (messagesDto.value ?? '').trim();
+    const file = (messagesDto as any).file ?? null;
 
-    if (chatIdDto.chatId) {
-      const chat = await this.chatBotRepository.findChatById(chatIdDto.chatId);
-      if (!chat)
+    if (!text && !file) {
+      throw new BadRequestException('Debe enviar un mensaje o una imagen.');
+    }
+
+    // ==========================
+    // ✅ VARIABLES MÉTRICAS (FUERA DEL TRY PARA USAR EN FINALLY)
+    // ==========================
+    const requestAt = new Date();
+    const startMs = Date.now();
+
+    const deviceIdMetric = messagesDto.deviceId ?? '';
+    const channel: 'web' | 'whatsapp' = deviceIdMetric.startsWith('wa_')
+      ? 'whatsapp'
+      : 'web';
+    const hasImage = Boolean(file);
+
+    let resolved = false;
+    let errorCode: string | null = null;
+    let usedModel: ChatModelsEnum | null = null;
+
+    // para poder guardar en finally sin “scope errors”
+    let toxicity: number | null = null;
+    let chatObjectId: Types.ObjectId | null = null;
+
+    try {
+      // ==========================
+      // ✅ TU LÓGICA ORIGINAL (IGUAL)
+      // ==========================
+      toxicity = text ? await this.perspectiveService.analyzeToxicity(text) : 0;
+
+      chatObjectId =
+        chatIdDto.chatId instanceof Types.ObjectId
+          ? chatIdDto.chatId
+          : new Types.ObjectId(String(chatIdDto.chatId));
+
+      if (chatIdDto.chatId) {
+        const chatCheck =
+          await this.chatBotRepository.findChatById(chatObjectId);
+
+        if (!chatCheck) {
+          throw new NotFoundException(
+            messageI18n(this.i18n, 'validation.chat_not_found'),
+          );
+        }
+
+        if (authDto?._id) {
+          if (String(chatCheck.createdBy._id) !== String(authDto._id)) {
+            throw new ForbiddenException(
+              messageI18n(this.i18n, 'validation.you_dont_have_access'),
+            );
+          }
+        }
+      }
+
+      const createdBy = authDto?._id
+        ? {
+            _id: authDto._id,
+            names: authDto.names ?? 'Anonymous',
+            lastNames: authDto.lastNames ?? '',
+            picture: authDto.picturePath ?? null,
+          }
+        : {
+            _id: null,
+            names: 'Anonymous',
+            lastNames: '',
+            picture: null,
+          };
+
+      if ((toxicity ?? 0) > 0.7) {
+        // blocked => NO resuelto
+        return {
+          _id: null,
+          role: 'system',
+          value: SystemMessageEnum.MESSAGE_BLOCKED_FOR_TOXICITY.toString(),
+          actions: [],
+        };
+      }
+
+      if (text && text.length > 1000) {
+        return {
+          _id: null,
+          role: 'system',
+          value: SystemMessageEnum.MESSAGE_TOO_LONG.toString(),
+          actions: [],
+        };
+      }
+
+      const chat = await this.chatBotRepository.findChatById(chatObjectId);
+      if (!chat) {
         throw new NotFoundException(
           messageI18n(this.i18n, 'validation.chat_not_found'),
         );
+      }
 
       if (authDto?._id) {
-        if (String(chat.createdBy._id) !== String(authDto._id)) {
-          throw new ForbiddenException(
-            messageI18n(this.i18n, 'validation.you_dont_have_access'),
+        const updatedCredit = await this.creditsRepository.consumeCreditDynamic(
+          authDto,
+          CREDIT_COSTS.CHAT_SIMPLE,
+        );
+
+        if (!updatedCredit) {
+          const message = await this.chatBotRepository.saveMessage({
+            chatId: chatObjectId,
+            role: 'system',
+            value: SystemMessageEnum.CREDITS_SOLD_OUT.toString(),
+            createdAt: new Date(),
+          });
+
+          return {
+            _id: (message as any)._id,
+            role: message.role,
+            value: message.value,
+            actions: [],
+            createdAt: message.createdAt,
+          };
+        }
+      }
+
+      let uploadedImage: any = null;
+      let inlineImagePart: GeminiPart | null = null;
+
+      if (file) {
+        if (!authDto?._id) {
+          throw new UnauthorizedException(
+            messageI18n(this.i18n, 'validation.user_not_authenticated'),
           );
         }
-      }
-    }
 
-    const createdBy = authDto
-      ? {
-          _id: authDto._id,
-          names: authDto.names ?? 'Anonymous',
-          lastNames: authDto.lastNames ?? '',
-          picture: authDto.picturePath ?? null,
+        const fileForUpload = file?.bufferBase64
+          ? { ...file, buffer: Buffer.from(file.bufferBase64, 'base64') }
+          : file;
+
+        uploadedImage = await imageChatbotUpload(
+          fileForUpload,
+          authDto._id,
+          chatObjectId,
+        );
+
+        inlineImagePart = {
+          inlineData: {
+            mimeType: file.mimetype,
+            data: file.bufferBase64,
+          },
+        };
+      }
+
+      await this.chatBotRepository.saveMessage({
+        chatId: chatObjectId,
+        role: 'user',
+        value: file
+          ? {
+              text,
+              image: {
+                url: uploadedImage?.fullUrl ?? null,
+                key: uploadedImage?.key ?? null,
+                mimeType: uploadedImage?.mimeType ?? file.mimetype,
+                size: uploadedImage?.size ?? file.size,
+              },
+            }
+          : text,
+        toxicity: toxicity ?? 0,
+        createdBy,
+        deviceId: messagesDto.deviceId,
+        createdAt: new Date(),
+      });
+
+      const history = await this.chatBotRepository.getRecentMessages(
+        chatObjectId,
+        9,
+      );
+
+      const historyWithoutLastUser =
+        history.length && history[history.length - 1]?.role === 'user'
+          ? history.slice(0, -1)
+          : history;
+
+      const historyParts = historyWithoutLastUser
+        .map((msg: any) => {
+          if (msg.role === 'system') {
+            const t = messageToText(msg.value).trim();
+            return t ? ({ role: 'model', parts: [{ text: t }] } as any) : null;
+          }
+          return toGeminiMsgFromDb(msg);
+        })
+        .filter(Boolean) as Array<{
+        role: 'user' | 'model';
+        parts: GeminiPart[];
+      }>;
+
+      const deviceId = messagesDto.deviceId ?? '';
+      const isWhatsApp = deviceId.startsWith('wa_');
+
+      const ragHits =
+        !isWhatsApp && text ? await this.ragQueryUseCase.search(text, 4) : [];
+
+      const ragContext = ragHits.length
+        ? `\n\n### CONTEXTO (RAG)\n${ragHits.map((h) => `- ${h}`).join('\n')}\n`
+        : '';
+
+      const alternativePrompts =
+        await this.chatBotRepository.getAllActivePrompts();
+      const alternativesSection = alternativePrompts?.length
+        ? alternativePrompts.map((row) => `- ${row.name.toString()}`).join('\n')
+        : '';
+
+      const systemPrompt = isWhatsApp
+        ? `
+Eres un experto en turismo en Lima. Responde SIEMPRE en español.
+Devuelve SOLO TEXTO PLANO (sin JSON, sin markdown).
+No uses asteriscos (*), ni títulos con #, ni backticks.
+Sé claro, natural y útil.
+Máximo 6-8 líneas. Si listás, usa viñetas con "-" (guion).
+`.trim()
+        : `
+Eres un experto en turismos en Lima. Responde SIEMPRE en español de forma clara y útil.
+
+La respuesta debe ser un JSON válido, sin texto adicional fuera del JSON.
+El JSON debe tener siempre las claves "value" y "actions".
+"value" es un string con la respuesta a la conversación actual.
+"actions" es un arreglo (array) de strings con posibles acciones o preguntas de seguimiento.
+Si no hay acciones, "actions" debe ser un arreglo vacío ([]).
+
+IMPORTANTE:
+Ten en cuenta que esta respuesta forma parte de una conversación y que recibes el hilo completo.
+
+${alternativesSection ? `### Sugerencias:\n${alternativesSection}\n` : ''}
+
+Ejemplo:
+{ "value": "Aquí está la información que solicitaste.", "actions": ["DESTINY_FIND_BEST_VIEWS"] }
+
+${ragContext ? ragContext : ''}
+
+Responde SOLO con ese JSON.
+`.trim();
+
+      const currentUserParts: GeminiPart[] = [];
+      if (text) currentUserParts.push({ text });
+      if (inlineImagePart) currentUserParts.push(inlineImagePart);
+      if (!currentUserParts.length) currentUserParts.push({ text: '' });
+
+      const finalConversation = [
+        ...historyParts,
+        { role: 'user', parts: currentUserParts },
+      ];
+
+      // ==========================
+      // ✅ AQUÍ SE MIDE EL TIEMPO REAL (TMR)
+      // ==========================
+      let geminiContent = await this.geminiService.chatWithHistory(
+        finalConversation as any,
+        systemPrompt,
+      );
+
+      // si llegó hasta aquí => hay respuesta del modelo
+      resolved = true;
+      usedModel = ChatModelsEnum.GEMINI_2_5_FLASH;
+
+      if (isWhatsApp) {
+        let plain =
+          typeof geminiContent === 'string'
+            ? geminiContent
+            : typeof geminiContent?.value === 'string'
+              ? geminiContent.value
+              : '';
+
+        plain = plain
+          .replace(/```[\s\S]*?```/g, '')
+          .replace(/[*_`]/g, '')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+
+        const MAX_WA = 1200;
+        if (plain.length > MAX_WA) plain = plain.slice(0, MAX_WA).trim() + '…';
+
+        geminiContent = plain;
+      }
+
+      const MAX_LENGTH = 1000;
+      if (
+        typeof geminiContent === 'string' &&
+        geminiContent.length > MAX_LENGTH
+      ) {
+        geminiContent = geminiContent.slice(0, MAX_LENGTH);
+      }
+
+      if (geminiContent && typeof geminiContent === 'object') {
+        const obj = geminiContent as Record<string, any>;
+        if ('name' in obj && obj.name && chatIdDto.chatId) {
+          await this.ensureChatName(chatIdDto.chatId, obj.name);
+          delete obj.name;
         }
-      : {
-          _id: null,
-          names: 'Anonymous',
-          lastNames: '',
-          picture: null,
-        };
+      }
 
-    await this.chatBotRepository.saveMessage({
-      chatId: new Types.ObjectId(chatIdDto.chatId),
-      role: 'user',
-      value: messagesDto.value,
-      toxicity,
-      createdBy,
-      deviceId: messagesDto.deviceId,
-      createdAt: new Date(),
-    });
+      const modelMessage = await this.chatBotRepository.saveMessage({
+        chatId: chatObjectId,
+        role: 'model',
+        value: geminiContent,
+        model: ChatModelsEnum.GEMINI_2_5_FLASH,
+        deviceId: messagesDto.deviceId,
+        createdAt: new Date(),
+      });
 
-    if (toxicity > 0.7) {
-      return {
-        _id: null,
-        role: 'system',
-        value: SystemMessageEnum.MESSAGE_BLOCKED_FOR_TOXICITY.toString(),
-      };
-    }
-
-    if (messagesDto.value.length > 1000) {
-      return {
-        _id: null,
-        role: 'system',
-        message: SystemMessageEnum.MESSAGE_TOO_LONG.toString(),
-      };
-    }
-
-    const chat = await this.chatBotRepository.findChatById(
-      new Types.ObjectId(chatIdDto.chatId),
-    );
-
-    if (!chat) {
-      throw new NotFoundException(
-        messageI18n(this.i18n, 'validation.chat_not_found'),
-      );
-    }
-
-    if (authDto?._id) {
-      const updatedCredit = await this.creditsRepository.consumeCreditDynamic(
-        authDto,
-        CREDIT_COSTS.CHAT_SIMPLE,
-      );
-
-      if (!updatedCredit) {
-        const message = await this.chatBotRepository.saveMessage({
-          chatId: new Types.ObjectId(chatIdDto.chatId),
-          role: 'system',
-          value: SystemMessageEnum.CREDITS_SOLD_OUT.toString(),
-          createdAt: new Date(),
-        });
+      if (isWhatsApp) {
         return {
-          _id: (message as any)._id,
-          role: message.role,
-          value: message.value,
-          createdAt: message.createdAt,
+          _id: (modelMessage as any)._id,
+          role: 'model',
+          value: geminiContent,
+          actions: [],
+          createdAt: (modelMessage as any).createdAt,
         };
       }
-    }
 
-    const history = await this.chatBotRepository.getRecentMessages(
-      new Types.ObjectId(chatIdDto.chatId),
-      8,
-    );
-
-    const conversation = history
-      .filter((msg) => typeof msg.value === 'string')
-      .map((msg) => ({
-        role: msg.role,
-        content: msg.value,
-      }));
-
-    const alternativePrompts =
-      await this.chatBotRepository.getAllActivePrompts();
-
-    let alternativesSection = '';
-    if (alternativePrompts.length) {
-      alternativesSection = alternativePrompts
-        .map((row) => `- ${row.name.toString()}`)
-        .join('\n');
-    }
-
-    const systemPrompt = `
-  Eres un experto en turismos en Lima. Responde SIEMPRE en español de forma clara y útil.
-  La respuesta debe ser un JSON válido, sin texto adicional fuera del JSON.
-  El JSON debe tener siempre las claves "value" y "actions".
-  "value" es un string con la respuesta a la conversación actual.
-  "actions" es un arreglo (array) de strings con posibles acciones o preguntas de seguimiento.
-  Si no hay acciones, "actions" debe ser un arreglo vacío ([]).
-
-  IMPORTANTE: Ten en cuenta que esta respuesta forma parte de una conversación y que recibes
-  el hilo completo de los últimos mensajes intercambiados para entender el contexto.
-  Por eso, debes dar respuestas coherentes que mantengan la continuidad y relevancia
-  según el historial enviado.
-
-  ${
-    alternativesSection
-      ? `### Sugerencias para el Usuario (Accesos Directos):\nConsidera recomendar al usuario hasta dos de estas preguntas de seguimiento relevantes para continuar la conversación (Si no aplica, no incluyas esta sección):\n${alternativesSection}`
-      : ''
-  }
-
-  Ejemplo de respuesta válida:
-  {
-    "value": "Aquí está la información que solicitaste.",
-    "actions": ["DESTINY_FIND_BEST_VIEWS", "DESTINY_DISCOVER_BEST_PLACES"]
-  }
-
-  Responde SOLO con ese JSON.
-`;
-
-    let geminiContent = await this.geminiService.chatWithHistory(
-      conversation,
-      systemPrompt,
-    );
-
-    const MAX_LENGTH = 1000;
-
-    if (
-      typeof geminiContent === 'string' &&
-      geminiContent.length > MAX_LENGTH
-    ) {
-      geminiContent = geminiContent.slice(0, MAX_LENGTH);
-      const lastDot = geminiContent.lastIndexOf('.');
-      const lastSpace = geminiContent.lastIndexOf(' ');
-      if (lastDot > MAX_LENGTH * 0.6) {
-        geminiContent = geminiContent.slice(0, lastDot + 1);
-      } else if (lastSpace > MAX_LENGTH * 0.6) {
-        geminiContent = geminiContent.slice(0, lastSpace) + '...';
-      } else {
-        geminiContent = geminiContent + '...';
-      }
-    }
-
-    if (geminiContent && typeof geminiContent === 'object') {
-      const obj = geminiContent as Record<string, any>;
-      if ('name' in obj && obj.name && chatIdDto.chatId) {
-        await this.ensureChatName(chatIdDto.chatId, obj.name);
-        delete obj.name;
-      }
-    }
-
-    const modelMessage = await this.chatBotRepository.saveMessage({
-      chatId: new Types.ObjectId(chatIdDto.chatId),
-      role: 'model',
-      value: geminiContent,
-      model: ChatModelsEnum.GEMINI_2_5_FLASH,
-      deviceId: messagesDto.deviceId,
-      createdAt: new Date(),
-    });
-
-    return {
-      _id: (modelMessage as any)._id,
-      role: 'model',
-      value:
+      const value =
         typeof geminiContent === 'object' &&
         geminiContent !== null &&
         Object.prototype.hasOwnProperty.call(geminiContent, 'value')
           ? (geminiContent as Record<string, any>).value
-          : geminiContent,
-      actions:
+          : geminiContent;
+
+      const actions =
         typeof geminiContent === 'object' &&
         geminiContent !== null &&
         Object.prototype.hasOwnProperty.call(geminiContent, 'actions')
           ? Array.isArray((geminiContent as Record<string, any>).actions)
             ? (geminiContent as Record<string, any>).actions.map((act: any) =>
-                typeof act === 'string' ? act : act.name,
+                typeof act === 'string' ? act : act?.name,
               )
             : []
-          : [],
-      createdAt: (modelMessage as any).createdAt,
-    };
+          : [];
+
+      return {
+        _id: (modelMessage as any)._id,
+        role: 'model',
+        value,
+        actions,
+        createdAt: (modelMessage as any).createdAt,
+      };
+    } catch (e: any) {
+      resolved = false;
+      errorCode = e?.name || 'UNKNOWN_ERROR';
+      throw e;
+    } finally {
+      try {
+        if (chatObjectId) {
+          const responseAt = new Date();
+          const responseTimeMs = Math.max(0, Date.now() - startMs);
+
+          const userId = authDto?._id ? new Types.ObjectId(authDto._id) : null;
+
+          await this.chatMetricsRepository.create({
+            chatId: chatObjectId,
+            userId,
+            deviceId: deviceIdMetric,
+            channel,
+            requestAt,
+            responseAt,
+            responseTimeMs,
+            resolved,
+            hasImage,
+            toxicity: typeof toxicity === 'number' ? toxicity : null,
+            model: usedModel ?? null,
+            errorCode,
+          });
+        }
+      } catch {
+        // no romper el chat si falla métrica
+      }
+    }
   }
 
   async generateRecommendations(
@@ -433,7 +612,7 @@ export class ChatBotService {
         );
 
       if (authDto?._id) {
-        if (String(chat.createdBy._id) !== String(authDto._id)) {
+        if (String(chat.createdBy?._id) !== String(authDto._id)) {
           throw new ForbiddenException(
             messageI18n(this.i18n, 'validation.you_dont_have_access'),
           );
@@ -459,6 +638,7 @@ export class ChatBotService {
           value: SystemMessageEnum.CREDITS_SOLD_OUT.toString(),
           createdAt: new Date(),
         });
+
         return {
           _id: (message as any)._id,
           role: message.role,
@@ -477,33 +657,39 @@ export class ChatBotService {
         messageI18n(this.i18n, 'validation.not_results_found'),
       );
 
-    let preferences: UserProfile;
-    if (chat && chat.user && authDto?._id) {
-      preferences = await this.chatBotRepository.findUserProfileById(
+    let preferences: UserProfile | null = null;
+
+    if (authDto?._id) {
+      const userProfile = await this.chatBotRepository.findUserProfileById(
         authDto._id,
       );
-    } else if (chat) {
+
+      if (this.hasUserPreferences(userProfile as any)) {
+        preferences = userProfile as any;
+      }
+    }
+
+    if (!preferences && chatId) {
       const chatPrefs = await this.chatBotRepository.getChatPreferences(chatId);
+
       preferences = {
         name: '',
-        jobTitle: chatPrefs.jobTitle || '',
+        jobTitle: (chatPrefs as any).jobTitle ?? '',
         interest: [],
         hobbies: '',
         languages: ['ES'],
         aboutMe: '',
         age: null,
         nationality: 'Perú',
-        favoriteFoods: chatPrefs.favoriteFoods || '',
-        medicalConsiderations: chatPrefs.medicalConsiderations || '',
-        funFact: chatPrefs.funFact || '',
-        perspectives: chatPrefs.perspectives || [],
-        voiceTones: chatPrefs.voiceTones || [],
+        favoriteFoods: (chatPrefs as any).favoriteFoods ?? '',
+        medicalConsiderations: (chatPrefs as any).medicalConsiderations ?? '',
+        funFact: (chatPrefs as any).funFact ?? '',
+        perspectives: (chatPrefs as any).perspectives ?? [],
+        voiceTones: (chatPrefs as any).voiceTones ?? [],
       };
-    } else if (authDto?._id) {
-      preferences = await this.chatBotRepository.findUserProfileById(
-        authDto._id,
-      );
-    } else {
+    }
+
+    if (!preferences) {
       preferences = {
         name: '',
         jobTitle: '',
@@ -525,14 +711,11 @@ export class ChatBotService {
 
     try {
       let contextText = '';
-
-      if (promptRequested?.promptIntro) {
+      if (promptRequested?.promptIntro)
         contextText = promptRequested.promptIntro;
-      } else if (promptRequested?.shortIntro) {
+      else if (promptRequested?.shortIntro)
         contextText = promptRequested.shortIntro;
-      } else if (promptRequested?.name) {
-        contextText = promptRequested.name;
-      }
+      else if (promptRequested?.name) contextText = promptRequested.name;
 
       const aiResponse = await this.geminiService.recommendTravelHighlights(
         contextText,
@@ -585,6 +768,7 @@ export class ChatBotService {
         if (!authDto?._id && !actions.includes(ChatActionsEnum.SIGN_IN)) {
           actions.push(ChatActionsEnum.SIGN_IN);
         }
+
         const savedMessage = await this.chatBotRepository.saveMessage({
           chatId: chatId ? new Types.ObjectId(chatId) : null,
           role: 'model',
@@ -604,7 +788,7 @@ export class ChatBotService {
         });
 
         aiResponse.recommendations = aiResponse.recommendations.map(
-          (rec: any, idx: any) => ({
+          (rec: any, idx: number) => ({
             ...rec,
             external: idx === 0 ? false : rec.external,
           }),
@@ -618,6 +802,7 @@ export class ChatBotService {
           createdAt: savedMessage.createdAt,
         };
       }
+
       return null;
     } catch (error: any) {
       new Logger().errorMessage('Error prompt request', error.message);
@@ -636,6 +821,20 @@ export class ChatBotService {
     if (chat && (!chat.name || chat.name.trim() === '')) {
       await this.chatBotRepository.updateChatName(chat._id, name);
     }
+  }
+
+  private hasUserPreferences(profile: UserProfile | null | undefined): boolean {
+    if (!profile) return false;
+
+    return Boolean(
+      (profile.jobTitle ?? '').trim() ||
+        (profile.favoriteFoods ?? '').trim() ||
+        (profile.medicalConsiderations ?? '').trim() ||
+        (profile.funFact ?? '').trim() ||
+        (Array.isArray(profile.perspectives) &&
+          profile.perspectives.length > 0) ||
+        (Array.isArray(profile.voiceTones) && profile.voiceTones.length > 0),
+    );
   }
 
   async detailChat(
@@ -685,7 +884,7 @@ export class ChatBotService {
       } else if (typeof msg.value === 'object' && msg.value !== null) {
         return {
           ...base,
-          ...(msg.value as any),
+          ...msg.value,
         };
       } else {
         return {
@@ -712,7 +911,9 @@ export class ChatBotService {
     const { file } = audioInterface;
 
     if (!authDto?._id) {
-      throw new UnauthorizedException('User not authenticated');
+      throw new UnauthorizedException(
+        messageI18n(this.i18n, 'validation.user_not_authenticated'),
+      );
     }
 
     let transcript: string;
@@ -744,7 +945,9 @@ export class ChatBotService {
 
   async messageTts(authDto: any, dto: TextToSpeechDto) {
     if (!authDto?._id) {
-      throw new UnauthorizedException('User not authenticated');
+      throw new UnauthorizedException(
+        messageI18n(this.i18n, 'validation.user_not_authenticated'),
+      );
     }
 
     let audioBuffer: Buffer;
@@ -784,5 +987,22 @@ export class ChatBotService {
     });
 
     return { audioBuffer, mimeType };
+  }
+
+  async uploadChatbotImage(
+    authDto: AuthDto,
+    chatIdDto: ChatIdDto,
+    chatbotImageUploadInterface: ChatbotImageUploadInterface,
+  ) {
+    if (!authDto?._id) {
+      throw new UnauthorizedException(
+        messageI18n(this.i18n, 'validation.user_not_authenticated'),
+      );
+    }
+    const userId = authDto._id;
+    const { chatId } = chatIdDto;
+    const { file } = chatbotImageUploadInterface;
+
+    return imageChatbotUpload(file, userId, chatId);
   }
 }

@@ -11,6 +11,8 @@ import { PackageModule } from '@/Application/Landing/Package/Package.module';
 import { PlanModule } from '@/Application/BackOffice/Plan/Plan.module';
 import { SubscriptionsModule } from '@/Application/BackOffice/Subscriptions/Subscriptions.module';
 import { LandingPlanModule } from '@/Application/Landing/Plan/LandingPlan.module';
+import { RagModule } from '@/Application/Landing/Rag/Rag.module';
+import { WhatsAppModule } from '@/Application/Landing/WhatsApp/whatsAppModule';
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { LandingPlanModule } from '@/Application/Landing/Plan/LandingPlan.module
       { path: 'api/v1', module: PlanModule },
       { path: 'api/v1', module: SubscriptionsModule },
       { path: 'api/v1', module: LandingPlanModule },
+      { path: 'api/v1', module: RagModule },
+      { path: 'api/v1', module: WhatsAppModule },
     ]),
   ],
 })

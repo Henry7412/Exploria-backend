@@ -27,16 +27,21 @@ export class SubscriptionGuardInterceptor implements NestInterceptor {
     next: CallHandler,
   ): Promise<Observable<any>> {
     const req: any = context.switchToHttp().getRequest();
-    const chatId: any = req.params.chatId;
+
+    const chatIdRaw = req?.params?.chatId ?? req?.body?.chatId ?? null;
+
+    if (!chatIdRaw) return next.handle();
+
+    const chatId = new Types.ObjectId(chatIdRaw);
     const authDto = req.user || null;
 
     if (!authDto) {
-      const userMessageCount = await this.chatBotRepository.countUserMessages(
-        new Types.ObjectId(chatId),
-      );
+      const userMessageCount =
+        await this.chatBotRepository.countUserMessages(chatId);
+
       if (userMessageCount >= 3) {
         const message = await this.chatBotRepository.saveMessage({
-          chatId: new Types.ObjectId(chatId),
+          chatId,
           role: 'system',
           value: SystemMessageEnum.FREE_QUESTIONS_EXCEEDED.toString(),
           createdAt: new Date(),
@@ -49,6 +54,7 @@ export class SubscriptionGuardInterceptor implements NestInterceptor {
           createdAt: message.createdAt,
         });
       }
+
       return next.handle();
     }
 
@@ -56,7 +62,7 @@ export class SubscriptionGuardInterceptor implements NestInterceptor {
 
     if (!user) {
       const message = await this.chatBotRepository.saveMessage({
-        chatId: new Types.ObjectId(chatId),
+        chatId,
         role: 'system',
         value: SystemMessageEnum.USER_NOT_REGISTERED.toString(),
         createdAt: new Date(),
@@ -71,24 +77,15 @@ export class SubscriptionGuardInterceptor implements NestInterceptor {
     }
 
     const creditsAgg = await this.creditsModel.aggregate([
-      {
-        $match: {
-          userId: user._id,
-          active: true,
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: '$quantity' },
-        },
-      },
+      { $match: { userId: user._id, active: true } },
+      { $group: { _id: null, total: { $sum: '$quantity' } } },
     ]);
+
     const credits = creditsAgg[0]?.total ?? 0;
 
     if (credits <= 0) {
       const message = await this.chatBotRepository.saveMessage({
-        chatId: new Types.ObjectId(chatId),
+        chatId,
         role: 'system',
         value: SystemMessageEnum.CREDITS_SOLD_OUT.toString(),
         createdAt: new Date(),

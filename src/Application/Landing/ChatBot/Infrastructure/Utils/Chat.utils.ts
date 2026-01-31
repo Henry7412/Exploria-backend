@@ -120,8 +120,6 @@ export async function transcribeAudioWithGoogle(
 
     response = res;
   } catch (err: any) {
-    // ✅ Log de error real de Google
-
     throw new Error(err?.message || 'Google Speech-to-Text failed');
   }
 
@@ -133,7 +131,6 @@ export async function transcribeAudioWithGoogle(
 
   const finalText = transcript.trim();
 
-  // ✅ Si no hay texto, NO lo devuelvas como éxito
   if (!finalText) {
     throw new Error(
       'Speech-to-Text no devolvió resultados (audio sin voz, codec/config incorrecta, sample rate mismatch o audio largo).',
@@ -147,11 +144,11 @@ export type TtsFormat = 'mp3' | 'ogg';
 
 export type TtsOptions = {
   text: string;
-  languageCode?: string; // default: es-PE
-  voiceName?: string; // opcional
-  speakingRate?: number; // 0.25 - 4.0
-  pitch?: number; // -20 - 20
-  format?: TtsFormat; // mp3 | ogg
+  languageCode?: string;
+  voiceName?: string;
+  speakingRate?: number;
+  pitch?: number;
+  format?: TtsFormat;
 };
 
 export async function synthesizeTextWithGoogle(
@@ -171,13 +168,6 @@ export async function synthesizeTextWithGoogle(
   if (!text?.trim()) {
     throw new Error('Text is required');
   }
-
-  console.log('=========== TTS DEBUG ===========');
-  console.log('Text length:', text.length);
-  console.log('Language:', languageCode);
-  console.log('Voice:', voiceName ?? 'default');
-  console.log('Format:', format);
-  console.log('================================');
 
   const request: any = {
     input: { text },

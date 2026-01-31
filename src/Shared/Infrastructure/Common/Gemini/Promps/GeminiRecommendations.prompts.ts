@@ -117,8 +117,6 @@ export class GeminiRecommendationsPrompts {
         "Ideal para recorridos a pie",
         "Perfecto para fotografía arquitectónica y turismo cultural"
       ],
-      "link": "https://www.sernanp.gob.pe/huascaran",
-      "external": false
     }
   ]
 }`;
@@ -171,6 +169,7 @@ export class GeminiRecommendationsPrompts {
 
       Ejemplo:
       {
+      
         "name": null,
         "value": "Lo sentimos, no encontramos recomendaciones personalizadas para ti, Juan. Podrías darnos más contexto, actualizar tus preferencias, iniciar un plan de viaje${!logged ? ' o registrarte para recibir ayuda personalizada' : ''}.",
         "actions": ["UPDATE_PREFERENCES", ${!logged ? '"SIGN_IN"' : ''}],

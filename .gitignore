@@ -60,3 +60,22 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 src/Storage/Credentials/*.json
 
+# ngrok
+ngrok.yml
+.ngrok*
+
+# Uploads / storage
+uploads/
+storage/
+public/uploads/
+src/Storage/Uploads/
+
+# Keys & certificates
+*.pem
+*.key
+*.crt
+*.p12
+
+# Cache
+.cache
+.eslintcache

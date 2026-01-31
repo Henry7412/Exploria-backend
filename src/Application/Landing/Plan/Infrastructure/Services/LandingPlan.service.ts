@@ -140,10 +140,6 @@ export class LandingPlanService {
 
     const userPlans = plans.filter((plan) => plan.client === 'USER');
 
-    return {
-      data: {
-        user: userPlans,
-      },
-    };
+    return { user: userPlans };
   }
 }
