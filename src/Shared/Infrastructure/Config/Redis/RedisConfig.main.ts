@@ -10,16 +10,22 @@ export const RedisOptions: CacheModuleAsyncOptions = {
   isGlobal: true,
   imports: [ConfigModule],
   useFactory: async (configService: ConfigService) => {
+    const host = configService.get<string>('CLUSTER_HOST_REDIS');
+    const port = Number(configService.get<string>('REDIS_DB_PORT'));
+    const password = configService.get<string>('REDIS_PASSWORD');
+
     return {
       store: await redisStore({
         socket: {
-          host: configService.get<string>('CLUSTER_HOST_REDIS'),
-          port: parseInt(configService.get<string>('REDIS_DB_PORT')),
+          host,
+          port,
         },
+        password, // ✅ nuevo
         database: 1,
       }),
     };
   },
+
   inject: [ConfigService],
 };
 
@@ -32,7 +38,8 @@ export const RedisOptions: CacheModuleAsyncOptions = {
       useFactory: (configService: ConfigService) => ({
         redis: {
           host: configService.get<string>('CLUSTER_HOST_REDIS'),
-          port: parseInt(configService.get<string>('REDIS_DB_PORT')),
+          port: Number(configService.get<string>('REDIS_DB_PORT')),
+          password: configService.get<string>('REDIS_PASSWORD'),
         },
       }),
     }),

@@ -9,6 +9,7 @@ export class RedisVectorClient implements OnModuleInit {
     this.redis = new Redis({
       host: process.env.CLUSTER_HOST_REDIS,
       port: Number(process.env.REDIS_DB_PORT),
+      password: process.env.REDIS_PASSWORD,
     });
   }
 
