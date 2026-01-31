@@ -8,7 +8,7 @@ import { PackageIdDto } from '@/Application/Landing/Credits/Infrastructure/Dto/P
 import { CreditsRepository } from '@/Application/Landing/Credits/Infrastructure/Repositories/Credits.repository';
 import { AuthDto } from '@/Shared/Infrastructure/Common/Dto/Auth.dto';
 import { CreditProvideEnum } from '@/Shared/Infrastructure/Common/Enum/CreditProvide.enum';
-import { CreditStatusEnum } from '@/Shared/Infrastructure/Common/Enum/CreditsStatus.enum';
+import { CreditStatusEnum } from '@/Shared/Infrastructure/Common/Enum/CreditStatus.enum';
 import { PaymentStatusEnum } from '@/Shared/Infrastructure/Common/Enum/PaymentStatus.enum';
 import { messageI18n } from '@/Shared/Infrastructure/Helper/I18n.helper';
 import { NotificationTypesEnum } from '@/Shared/Infrastructure/Common/Enum/NotificationTypes.enum';

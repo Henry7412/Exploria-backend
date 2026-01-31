@@ -3,7 +3,7 @@ import { HydratedDocument, Types } from 'mongoose';
 
 import { CoinTypesEnum } from '@/Shared/Infrastructure/Common/Enum/CoinTypes.enum';
 import { CreditProvideEnum } from '@/Shared/Infrastructure/Common/Enum/CreditProvide.enum';
-import { CreditStatusEnum } from '@/Shared/Infrastructure/Common/Enum/CreditsStatus.enum';
+import { CreditStatusEnum } from '@/Shared/Infrastructure/Common/Enum/CreditStatus.enum';
 import { PaymentStatusEnum } from '@/Shared/Infrastructure/Common/Enum/PaymentStatus.enum';
 
 export type Credits = HydratedDocument<CreditsDocument>;

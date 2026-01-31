@@ -11,7 +11,7 @@ import { SubscriptionIdDto } from '@/Application/Landing/Plan/Infrastructure/Dto
 import { AuthDto } from '@/Shared/Infrastructure/Common/Dto/Auth.dto';
 import { CoinTypesEnum } from '@/Shared/Infrastructure/Common/Enum/CoinTypes.enum';
 import { CreditProvideEnum } from '@/Shared/Infrastructure/Common/Enum/CreditProvide.enum';
-import { CreditStatusEnum } from '@/Shared/Infrastructure/Common/Enum/CreditsStatus.enum';
+import { CreditStatusEnum } from '@/Shared/Infrastructure/Common/Enum/CreditStatus.enum';
 import { NotificationTypesEnum } from '@/Shared/Infrastructure/Common/Enum/NotificationTypes.enum';
 import { PaymentStatusEnum } from '@/Shared/Infrastructure/Common/Enum/PaymentStatus.enum';
 import { SubscriptionStatusEnum } from '@/Shared/Infrastructure/Common/Enum/SubscriptionStatus.enum';

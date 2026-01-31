@@ -5,7 +5,7 @@ import { Model, Types } from 'mongoose';
 import { CreditsDocument } from '@/Shared/Domain/Schemas/Credits.schema';
 import { AuthDto } from '@/Shared/Infrastructure/Common/Dto/Auth.dto';
 import { CreditProvideEnum } from '@/Shared/Infrastructure/Common/Enum/CreditProvide.enum';
-import { CreditStatusEnum } from '@/Shared/Infrastructure/Common/Enum/CreditsStatus.enum';
+import { CreditStatusEnum } from '@/Shared/Infrastructure/Common/Enum/CreditStatus.enum';
 
 @Injectable()
 export class CreditsRepository {
