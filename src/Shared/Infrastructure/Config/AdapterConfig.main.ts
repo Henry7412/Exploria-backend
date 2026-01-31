@@ -1,13 +1,12 @@
-import compression from '@fastify/compress';
-import fastifyCsrf from '@fastify/csrf-protection';
+import { constants } from 'zlib';
+import { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { HttpAdapterHost } from '@nestjs/core';
+
+import compress from '@fastify/compress';
 import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
-import { HttpAdapterHost } from '@nestjs/core';
-import { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { CsrfFilter } from 'ncsrf';
-import { constants } from 'zlib';
 
 import { HttpAdapterAllExceptionFilter } from '@/Shared/Infrastructure/ExceptionFilter/HttpAdapterAll.ExceptionFilter';
 import { ResponseInterceptor } from '@/Shared/Infrastructure/Interceptor/Response.interceptor';
@@ -25,10 +24,8 @@ export async function AdapterConfigMain(
   );
 
   const httpAdapter = app.get(HttpAdapterHost);
-  app.useGlobalFilters(
-    new HttpAdapterAllExceptionFilter(httpAdapter),
-    new CsrfFilter(),
-  );
+
+  app.useGlobalFilters(new HttpAdapterAllExceptionFilter(httpAdapter));
 
   app.useGlobalInterceptors(new ResponseInterceptor());
 
@@ -40,25 +37,69 @@ export async function AdapterConfigMain(
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     origin: true,
     credentials: true,
+    maxAge: 86400,
   });
 
-  await app.register(compression, {
-    brotliOptions: { params: { [constants.BROTLI_PARAM_QUALITY]: 4 } },
-    encodings: ['gzip', 'deflate', 'br'],
+  await app.register(compress, {
+    brotliOptions: {
+      params: {
+        [constants.BROTLI_PARAM_QUALITY]: 4,
+        [constants.BROTLI_PARAM_LGWIN]: 22,
+      },
+    },
+    encodings: ['br', 'gzip', 'deflate'],
     threshold: 1024,
   });
-
-  await app.register(fastifyCsrf);
 
   await app.register(helmet, {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: [`'self'`],
         styleSrc: [`'self'`, `'unsafe-inline'`],
-        imgSrc: [`'self'`, 'data:'],
+        imgSrc: [`'self'`, 'data:', 'https:'],
         scriptSrc: [`'self'`, `https: 'unsafe-inline'`],
+        connectSrc: [`'self'`],
+        fontSrc: [`'self'`, 'https:', 'data:'],
+        objectSrc: [`'none'`],
+        mediaSrc: [`'self'`],
+        frameSrc: [`'none'`],
+        upgradeInsecureRequests: [],
       },
     },
+    hsts: {
+      maxAge: 63072000,
+      includeSubDomains: true,
+      preload: true,
+    },
+  });
+
+  // ✅ Sanitización simple
+  await app.register((instance: any) => {
+    instance.addHook('preHandler', (request: any) => {
+      const sanitizeString = (str: string): string =>
+        str
+          .replace(/[<>]/g, '')
+          .replace(/javascript:/gi, '')
+          .replace(/on\w+=/gi, '')
+          .trim();
+
+      const sanitizeObject = (obj: any): any => {
+        if (typeof obj === 'string') return sanitizeString(obj);
+        if (typeof obj !== 'object' || obj === null) return obj;
+
+        const sanitized = Array.isArray(obj) ? [] : {};
+        for (const key in obj) {
+          if (key.startsWith('$') || key.includes('..') || key.includes('.')) {
+            continue;
+          }
+          sanitized[key] = sanitizeObject(obj[key]);
+        }
+        return sanitized;
+      };
+
+      if (request.body) request.body = sanitizeObject(request.body);
+      if (request.query) request.query = sanitizeObject(request.query);
+    });
   });
 
   await app.register(multipart, {
@@ -74,13 +115,16 @@ export async function AdapterConfigMain(
   });
 
   await app.register(rateLimit, {
-    max: 100,
+    max: process.env.NODE_ENV === 'production' ? 100 : 1000,
     timeWindow: '3 minute',
-    keyGenerator: (request) => request.ip,
+    keyGenerator: (request) => {
+      const authToken = request.headers['authorization'];
+      return authToken ? authToken.substring(7) : request.ip;
+    },
     hook: 'onRequest',
     allowList: (request) => {
       const url = request.url;
-      return /^\/api\/v1\/landing\/.*/.test(url);
+      return /^\/api\/v1\/landing\/.*/.test(url) || /^\/health/.test(url);
     },
     errorResponseBuilder: () => ({
       statusCode: 429,
