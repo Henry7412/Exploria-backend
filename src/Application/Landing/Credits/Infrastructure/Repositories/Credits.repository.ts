@@ -6,6 +6,7 @@ import { CreditsDocument } from '@/Shared/Domain/Schemas/Credits.schema';
 import { AuthDto } from '@/Shared/Infrastructure/Common/Dto/Auth.dto';
 import { CreditProvideEnum } from '@/Shared/Infrastructure/Common/Enum/CreditProvide.enum';
 import { CreditStatusEnum } from '@/Shared/Infrastructure/Common/Enum/CreditStatus.enum';
+import { PaymentStatusEnum } from '@/Shared/Infrastructure/Common/Enum/PaymentStatus.enum';
 
 @Injectable()
 export class CreditsRepository {
@@ -26,12 +27,12 @@ export class CreditsRepository {
       active: true,
       quantity: { $gte: quantity },
       userId: new Types.ObjectId(authDto._id),
+      $or: [
+        { payment: PaymentStatusEnum.PAID },
+        { payment: { $exists: false } },
+        { payment: null },
+      ],
     };
-
-    const creditDoc = await this.creditsModel.findOne(filter);
-    if (!creditDoc) {
-      throw new BadRequestException('Insufficient credits');
-    }
 
     const logEntry = {
       status: CreditStatusEnum.CONSUMED,
@@ -47,7 +48,7 @@ export class CreditsRepository {
     };
 
     const updated = await this.creditsModel.findOneAndUpdate(
-      { _id: creditDoc._id },
+      filter,
       {
         $inc: { quantity: -quantity },
         $set: {
@@ -60,7 +61,7 @@ export class CreditsRepository {
     );
 
     if (!updated) {
-      throw new BadRequestException('Failed to consume credits');
+      throw new BadRequestException('Insufficient credits');
     }
 
     return updated;

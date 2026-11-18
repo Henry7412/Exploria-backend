@@ -1,10 +1,12 @@
-import { Controller, Param, Put } from '@nestjs/common';
+import { Controller, Param, Put, UseGuards } from '@nestjs/common';
 import { I18nService } from 'nestjs-i18n';
+import { JwtAuthGuard } from '@/Shared/Infrastructure/Jwt/Guards/JwtAuth.guard';
 
 import { UpdateCreditsCancelUseCase } from '@/Application/BackOffice/Credits/Application/Put/UpdateCreditsCancel.useCase';
 import { CreditsDto } from '@/Application/BackOffice/Credits/Infrastructure/Dto/Credits.dto';
 import { successResponse } from '@/Shared/Infrastructure/Response/Response.json';
 
+@UseGuards(JwtAuthGuard)
 @Controller('back-office')
 export class UpdateCreditsCancelController {
   constructor(

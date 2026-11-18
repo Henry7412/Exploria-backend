@@ -56,7 +56,7 @@ export class LandingCreditsService {
       quantity: packageData.credits ?? 0,
       provide: CreditProvideEnum.SALE,
       status: CreditStatusEnum.CREDITED,
-      active: true,
+      active: false,
       amount: packageData.amount ?? 0,
       payment: PaymentStatusEnum.REQUESTED,
       createdAt: now,

@@ -32,6 +32,13 @@ export class PerspectiveService {
 
     const safety = result.response?.promptFeedback?.safetyRatings ?? [];
 
+    const probabilityMap: Record<string, number> = {
+      NEGLIGIBLE: 0.1,
+      LOW: 0.3,
+      MEDIUM: 0.6,
+      HIGH: 0.9,
+    };
+
     let toxicityScore = 0;
 
     for (const rating of safety) {
@@ -39,7 +46,11 @@ export class PerspectiveService {
         rating.category === HarmCategory.HARM_CATEGORY_HARASSMENT ||
         rating.category === HarmCategory.HARM_CATEGORY_HATE_SPEECH
       ) {
-        toxicityScore = Math.max(toxicityScore, rating.probability || 0);
+        const numericScore =
+          typeof rating.probability === 'number'
+            ? rating.probability
+            : (probabilityMap[String(rating.probability)] ?? 0);
+        toxicityScore = Math.max(toxicityScore, numericScore);
       }
     }
 

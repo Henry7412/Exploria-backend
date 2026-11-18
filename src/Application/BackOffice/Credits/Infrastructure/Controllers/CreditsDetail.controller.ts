@@ -1,10 +1,12 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '@/Shared/Infrastructure/Jwt/Guards/JwtAuth.guard';
 
 import { CreditsDto } from '@/Application/BackOffice/Credits/Infrastructure/Dto/Credits.dto';
 import { AuthDto } from '@/Shared/Infrastructure/Common/Dto/Auth.dto';
 import { GetAuth } from '@/Shared/Infrastructure/Decorator/Auth.decorator';
 import { CreditsDetailUseCase } from '@/Application/BackOffice/Credits/Application/Get/CreditsDetil.useCase';
 
+@UseGuards(JwtAuthGuard)
 @Controller('back-office')
 export class CreditsDetailController {
   constructor(private readonly creditsDetailUseCase: CreditsDetailUseCase) {}

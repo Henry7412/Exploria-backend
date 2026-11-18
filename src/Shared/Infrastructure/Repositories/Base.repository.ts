@@ -24,8 +24,8 @@ export abstract class BaseRepository<T extends Document> {
       .exec();
   }
 
-  async findById(id: Types.ObjectId): Promise<T | null> {
-    return await this.model.findById({ _id: id, active: true }).exec();
+  async findById(id: Types.ObjectId | string): Promise<T | null> {
+    return await this.model.findOne({ _id: id, active: true }).exec();
   }
 
   async findAll(): Promise<T[]> {

@@ -1,5 +1,6 @@
-import { Controller, Param, Put } from '@nestjs/common';
+import { Controller, Param, Put, UseGuards } from '@nestjs/common';
 import { I18nService } from 'nestjs-i18n';
+import { JwtAuthGuard } from '@/Shared/Infrastructure/Jwt/Guards/JwtAuth.guard';
 
 import { UpdatePlanUserCancelUseCase } from '@/Application/BackOffice/Plan/Application/Put/UpdatePlanUserCancel.useCase';
 import { PlanDto } from '@/Application/BackOffice/Plan/Infrastructure/Dto/Plan.dto';
@@ -7,6 +8,7 @@ import { AuthDto } from '@/Shared/Infrastructure/Common/Dto/Auth.dto';
 import { GetAuth } from '@/Shared/Infrastructure/Decorator/Auth.decorator';
 import { successResponse } from '@/Shared/Infrastructure/Response/Response.json';
 
+@UseGuards(JwtAuthGuard)
 @Controller('back-office')
 export class UpdatePlanUserCancelController {
   constructor(

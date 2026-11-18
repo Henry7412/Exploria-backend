@@ -73,6 +73,10 @@ export class AuthService {
       );
     }
 
+    if (!user.password) {
+      throw new BadRequestException(messageI18n(this.i18n, 'auth.failed'));
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       throw new BadRequestException(messageI18n(this.i18n, 'auth.failed'));
@@ -93,6 +97,9 @@ export class AuthService {
 
   async setAuthUser(emailOrPhone: string): Promise<any> {
     const auth = await this.userRepository.findByEmailOrPhone(emailOrPhone);
+    if (!auth) {
+      throw new UnauthorizedException();
+    }
 
     const userCache = await this.redisClientService.getItem(
       auth._id.toString(),
@@ -100,14 +107,10 @@ export class AuthService {
 
     if (userCache) {
       return userCache;
-    } else {
-      if (!auth) {
-        throw new UnauthorizedException();
-      }
-
-      await this.saveAuthUser(auth);
-      return await this.redisClientService.getItem(auth._id.toString());
     }
+
+    await this.saveAuthUser(auth);
+    return await this.redisClientService.getItem(auth._id.toString());
   }
 
   private async saveAuthUser(user: any) {

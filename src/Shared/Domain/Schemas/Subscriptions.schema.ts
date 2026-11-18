@@ -41,7 +41,7 @@ export class SubscriptionsDocument {
   @Prop({ type: String })
   file: string;
 
-  @Prop({ type: String, required: false, unique: true, index: true })
+  @Prop({ type: String, required: false, unique: true, sparse: true, index: true })
   orderCode: string;
 
   @Prop({ type: Boolean, default: false })

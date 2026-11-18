@@ -33,9 +33,13 @@ export async function AdapterConfigMain(
     type: VersioningType.URI,
   });
 
+  const corsOrigins = process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',').map((origin) => origin.trim())
+    : true;
+
   app.enableCors({
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    origin: true,
+    origin: corsOrigins,
     credentials: true,
     maxAge: 86400,
   });
@@ -73,9 +77,11 @@ export async function AdapterConfigMain(
     },
   });
 
-  // ✅ Sanitización simple
-  await app.register((instance: any) => {
-    instance.addHook('preHandler', (request: any) => {
+  // ✅ Sanitización simple (sin encapsulación para aplicar a todas las rutas)
+  const fastifyInstance = app.getHttpAdapter().getInstance();
+  fastifyInstance.addHook(
+    'preHandler',
+    (request: any, _reply: any, done: () => void) => {
       const sanitizeString = (str: string): string =>
         str
           .replace(/[<>]/g, '')
@@ -99,13 +105,14 @@ export async function AdapterConfigMain(
 
       if (request.body) request.body = sanitizeObject(request.body);
       if (request.query) request.query = sanitizeObject(request.query);
-    });
-  });
+      done();
+    },
+  );
 
   await app.register(multipart, {
     throwFileSizeLimit: true,
     limits: {
-      fileSize: 5 * 1024 * 1024,
+      fileSize: 10 * 1024 * 1024,
       fieldNameSize: 5 * 1024 * 1024,
       fields: 5,
       fieldSize: 5 * 1024 * 1024,
@@ -117,15 +124,9 @@ export async function AdapterConfigMain(
   await app.register(rateLimit, {
     max: process.env.NODE_ENV === 'production' ? 100 : 1000,
     timeWindow: '3 minute',
-    keyGenerator: (request) => {
-      const authToken = request.headers['authorization'];
-      return authToken ? authToken.substring(7) : request.ip;
-    },
+    keyGenerator: (request) => request.ip,
     hook: 'onRequest',
-    allowList: (request) => {
-      const url = request.url;
-      return /^\/api\/v1\/landing\/.*/.test(url) || /^\/health/.test(url);
-    },
+    allowList: (request) => /^\/health/.test(request.url),
     errorResponseBuilder: () => ({
       statusCode: 429,
       error: 'Too Many Requests',

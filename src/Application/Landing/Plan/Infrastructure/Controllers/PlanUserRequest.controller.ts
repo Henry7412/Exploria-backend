@@ -1,5 +1,6 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { I18nService } from 'nestjs-i18n';
+import { JwtAuthGuard } from '@/Shared/Infrastructure/Jwt/Guards/JwtAuth.guard';
 
 import { PlanUserRequestUseCase } from '@/Application/Landing/Plan/Application/Post/PlanUserRequest.useCase';
 import { SubscriptionIdDto } from '@/Application/Landing/Plan/Infrastructure/Dto/SubscriptionId.Dto';
@@ -14,6 +15,7 @@ export class PlanUserRequestController {
     private readonly i18n: I18nService,
   ) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post('plan/user/request')
   async __invoke(
     @GetAuth() authDto: AuthDto,

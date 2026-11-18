@@ -118,7 +118,7 @@ export class LandingPlanService {
         quantity: creditsToAdd,
         provide: CreditProvideEnum.SUBSCRIPTION,
         status: CreditStatusEnum.CREDITED,
-        active: true,
+        active: false,
         amount: 0,
         createdAt: now,
       });

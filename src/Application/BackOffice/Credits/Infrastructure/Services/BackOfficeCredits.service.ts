@@ -57,6 +57,7 @@ export class BackOfficeCreditsService {
       creditsDto.id,
       {
         payment: PaymentStatusEnum.CANCELED,
+        active: false,
         updatedAt: new Date(),
       },
     );
@@ -87,6 +88,7 @@ export class BackOfficeCreditsService {
       creditsDto.id,
       {
         payment: PaymentStatusEnum.PAID,
+        active: true,
         file: creditTypeDto.file,
         updatedAt: now,
       },

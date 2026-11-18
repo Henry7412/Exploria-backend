@@ -1,5 +1,6 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { I18nService } from 'nestjs-i18n';
+import { JwtAuthGuard } from '@/Shared/Infrastructure/Jwt/Guards/JwtAuth.guard';
 
 import { PackageIdDto } from '@/Application/Landing/Credits/Infrastructure/Dto/PackageId.dto';
 import { AuthDto } from '@/Shared/Infrastructure/Common/Dto/Auth.dto';
@@ -14,6 +15,7 @@ export class CreditsUserRequestController {
     private readonly i18n: I18nService,
   ) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post('credits/request')
   async __invoke(
     @GetAuth() authDto: AuthDto,

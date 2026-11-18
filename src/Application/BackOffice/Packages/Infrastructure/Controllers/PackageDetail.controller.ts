@@ -1,10 +1,12 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '@/Shared/Infrastructure/Jwt/Guards/JwtAuth.guard';
 
 import { PackageDetailUseCase } from '@/Application/BackOffice/Packages/Application/Get/PackageDetail.useCase';
 import { PackageDto } from '@/Application/BackOffice/Packages/Infrastructure/Dto/Package.dto';
 import { AuthDto } from '@/Shared/Infrastructure/Common/Dto/Auth.dto';
 import { GetAuth } from '@/Shared/Infrastructure/Decorator/Auth.decorator';
 
+@UseGuards(JwtAuthGuard)
 @Controller('back-office')
 export class PackageDetailController {
   constructor(private readonly packageDetailUseCase: PackageDetailUseCase) {}

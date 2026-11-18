@@ -10,6 +10,10 @@ export class RagQueryUseCase {
   ) {}
 
   async search(query: string, k = 3): Promise<string[]> {
+    if (!this.redisVector.isVectorEnabled) {
+      return [];
+    }
+
     const embedding = await this.embedding.embed(query);
     const buffer = this.embedding.toBuffer(embedding);
 

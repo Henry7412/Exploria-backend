@@ -1,5 +1,6 @@
-import { Controller, Delete, Param } from '@nestjs/common';
+import { Controller, Delete, Param, UseGuards } from '@nestjs/common';
 import { I18nService } from 'nestjs-i18n';
+import { JwtAuthGuard } from '@/Shared/Infrastructure/Jwt/Guards/JwtAuth.guard';
 
 import { DeletePackageUseCase } from '@/Application/BackOffice/Packages/Application/Delete/DeletePackage.useCase';
 import { PackageDto } from '@/Application/BackOffice/Packages/Infrastructure/Dto/Package.dto';
@@ -7,6 +8,7 @@ import { AuthDto } from '@/Shared/Infrastructure/Common/Dto/Auth.dto';
 import { GetAuth } from '@/Shared/Infrastructure/Decorator/Auth.decorator';
 import { successResponse } from '@/Shared/Infrastructure/Response/Response.json';
 
+@UseGuards(JwtAuthGuard)
 @Controller('back-office')
 export class DeletePackageController {
   constructor(

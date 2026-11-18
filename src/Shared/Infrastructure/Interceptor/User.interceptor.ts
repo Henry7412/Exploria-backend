@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   Injectable,
   NestInterceptor,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
@@ -20,17 +21,21 @@ export class UserInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest();
 
     const authHeader = request.headers['authorization'];
-    const token = authHeader?.replace('Bearer ', '');
+    const token = authHeader?.replace(/^Bearer\s+/i, '');
 
     if (!token) {
       return next.handle();
     }
 
-    const decodedToken = this.jwtService.verify(token);
-    const authSignInDto = decodedToken as AuthSignInDto;
-    const { emailOrPhone } = authSignInDto;
+    try {
+      const decodedToken = this.jwtService.verify(token);
+      const authSignInDto = decodedToken as AuthSignInDto;
+      const { emailOrPhone } = authSignInDto;
 
-    request.user = await this.authService.setAuthUser(emailOrPhone);
+      request.user = await this.authService.setAuthUser(emailOrPhone);
+    } catch {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
 
     return next.handle();
   }

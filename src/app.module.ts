@@ -19,8 +19,10 @@ import { SubscriptionsModule } from '@/Application/BackOffice/Subscriptions/Subs
 import { LandingPlanModule } from '@/Application/Landing/Plan/LandingPlan.module';
 import { RagModule } from '@/Application/Landing/Rag/Rag.module';
 import { WhatsAppModule } from '@/Application/Landing/WhatsApp/whatsAppModule';
+import { HealthController } from '@/Shared/Infrastructure/Health/Health.controller';
 
 @Module({
+  controllers: [HealthController],
   imports: [
     EnvConfigModule,
     ScheduleModule.forRoot(),

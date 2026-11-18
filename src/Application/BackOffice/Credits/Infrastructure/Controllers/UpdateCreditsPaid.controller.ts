@@ -1,5 +1,6 @@
-import { Body, Controller, Param, Put } from '@nestjs/common';
+import { Body, Controller, Param, Put, UseGuards } from '@nestjs/common';
 import { I18nService } from 'nestjs-i18n';
+import { JwtAuthGuard } from '@/Shared/Infrastructure/Jwt/Guards/JwtAuth.guard';
 
 import { UpdateCreditsPaidUseCase } from '@/Application/BackOffice/Credits/Application/Put/UpdateCreditsPaid.useCase';
 import { CreditTypeDto } from '@/Application/BackOffice/Credits/Infrastructure/Dto/CreditType.dto';
@@ -7,6 +8,7 @@ import { successResponse } from '@/Shared/Infrastructure/Response/Response.json'
 
 import { CreditsDto } from '../Dto/Credits.dto';
 
+@UseGuards(JwtAuthGuard)
 @Controller('back-office')
 export class UpdateCreditsPaidController {
   constructor(

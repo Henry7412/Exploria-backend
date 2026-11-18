@@ -1,5 +1,6 @@
-import { Body, Controller, Post, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards, UseInterceptors } from '@nestjs/common';
 import { I18nService } from 'nestjs-i18n';
+import { JwtAuthGuard } from '@/Shared/Infrastructure/Jwt/Guards/JwtAuth.guard';
 
 import { AuthDto } from '@/Shared/Infrastructure/Common/Dto/Auth.dto';
 import { GetAuth } from '@/Shared/Infrastructure/Decorator/Auth.decorator';
@@ -16,6 +17,7 @@ export class UserPictureController {
     private readonly i18n: I18nService,
   ) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post('picture')
   @UseInterceptors(new TransformBodyImageFileInterceptor(UserPictureDto))
   async __invoke(

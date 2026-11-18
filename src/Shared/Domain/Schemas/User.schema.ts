@@ -64,7 +64,7 @@ export class UserDocument {
     type: Types.ObjectId,
     ref: 'Plans',
     index: true,
-    default: PlanSubscriptionEnum.PLAN_FREE,
+    default: null,
   })
   plan: Types.ObjectId;
 
